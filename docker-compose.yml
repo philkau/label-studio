@@ -41,10 +41,6 @@ services:
       - LABEL_STUDIO_HOST=${LABEL_STUDIO_HOST:-}
     volumes:
       - ./mydata:/label-studio/data:rw
-      - type: tmpfs
-        target: /var/lib/postgresql/data/pg_stat_tmp
-        tmpfs:
-          size: 268435456  #256 Mb
 
   db:
     image: postgres:11.5
@@ -62,6 +58,10 @@ services:
     volumes:
       - ${POSTGRES_DATA_DIR:-./postgres-data}:/var/lib/postgresql/data
       - ./deploy/pgsql/certs:/var/lib/postgresql/certs:ro
+      - type: tmpfs
+        target: /var/lib/postgresql/data/pg_stat_tmp
+        tmpfs:
+          size: 268435456  #256 Mb
 
 volumes:
   static: {}

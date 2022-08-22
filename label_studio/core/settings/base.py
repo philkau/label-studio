@@ -102,10 +102,20 @@ DATABASES = {'default': DATABASES_ALL.get(get_env('DJANGO_DB', 'default'))}
 
 DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 
+formatter = 'standard'
+JSON_LOG = get_bool_env('JSON_LOG', False)
+if JSON_LOG:
+    formatter = 'json'
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
+        'json': {
+            '()': 'core.utils.CustomJsonFormatter',
+            'format': '[%(asctime)s] [%(name)s::%(funcName)s::%(lineno)d] [%(levelname)s] [%(request_id)s] %(message)s',
+            'datefmt': '%d/%b/%Y:%H:%M:%S %z',
+        },
         'standard': {
             'format': '[%(asctime)s] [%(name)s::%(funcName)s::%(lineno)d] [%(levelname)s] %(message)s',
         },
@@ -123,9 +133,9 @@ LOGGING = {
             'class': 'logging.StreamHandler',
         },
         'console': {
-            'level': get_env('LOG_LEVEL', 'WARNING'),
+            'level': get_env('LOG_LEVEL', 'INFO'),
             'class': 'logging.StreamHandler',
-            'formatter': 'standard',
+            'formatter': formatter,
         },
         'rq_console': {
             'level': 'WARNING',
