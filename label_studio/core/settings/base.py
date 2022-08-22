@@ -112,7 +112,7 @@ LOGGING = {
     'disable_existing_loggers': False,
     'formatters': {
         'json': {
-            '()': 'core.utils.CustomJsonFormatter',
+            '()': 'core.utils.formatter.CustomJsonFormatter',
             'format': '[%(asctime)s] [%(name)s::%(funcName)s::%(lineno)d] [%(levelname)s] [%(request_id)s] %(message)s',
             'datefmt': '%d/%b/%Y:%H:%M:%S %z',
         },
