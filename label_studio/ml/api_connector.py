@@ -267,14 +267,17 @@ class CentralApi(BaseHTTPAPI):
             status_code = response.status_code if response is not None else 0
             return MLApiResult(url, request, {'error': str(e)}, headers, 'error', status_code=status_code)
         status_code = response.status_code
-        try:
-            response = response.json()
-        except ValueError as e:
-            # logger.warning(f'Error parsing JSON response from {url}. Response: {response.content}', exc_info=True)
-            return MLApiResult(
-                url, request, {'error': str(e), 'response': response.content}, headers, 'error',
-                status_code=status_code
-            )
+        if (len(response.content) != 0):
+            try:
+                response = response.json()
+            except ValueError as e:
+                # logger.warning(f'Error parsing JSON response from {url}. Response: {response.content}', exc_info=True)
+                return MLApiResult(
+                    url, request, {'error': str(e), 'response': response.content}, headers, 'error',
+                    status_code=status_code
+                )
+        else:
+            response = {}
         # if verbose:
         #     logger.info(f'Response from {url}: {json.dumps(response, indent=2)}')
         return MLApiResult(url, request, response, headers, status_code=status_code)
