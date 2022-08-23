@@ -12,6 +12,8 @@ _api_urlpatterns = [
     path('', api.MLBackendListAPI.as_view(), name='ml-list'),
     path('<int:pk>', api.MLBackendDetailAPI.as_view(), name='ml-detail'),
     path('<int:pk>/train', api.MLBackendTrainAPI.as_view(), name='ml-train'),
+    path('<int:pk>/central-train', api.CentralTrainAPI.as_view(), name='central-ml-train'),
+    path('<int:pk>/experiment', api.CentralExperimentAPI.as_view(), name='central-ml-experiment'),
     path(
         '<int:pk>/interactive-annotating',
         api.MLBackendInteractiveAnnotating.as_view(),

@@ -32,6 +32,7 @@ TIMEOUT_SETUP = float(get_env('ML_TIMEOUT_SETUP', 3))
 TIMEOUT_DUPLICATE_MODEL = float(get_env('ML_TIMEOUT_DUPLICATE_MODEL', 1))
 TIMEOUT_DELETE = float(get_env('ML_TIMEOUT_DELETE', 1))
 TIMEOUT_TRAIN_JOB_STATUS = float(get_env('ML_TIMEOUT_TRAIN_JOB_STATUS', 1))
+CENTRAL_SERVICE_URL = get_env('CENTRAL_SERVICE_URL', 'http://tp-central-service:6150')
 
 
 class BaseHTTPAPI(object):
@@ -216,6 +217,7 @@ class MLApi(BaseHTTPAPI):
     def setup(self, project):
         return self._request('setup', request={
             'project': self._create_project_uid(project),
+            'label_config': project.label_config,
             'schema': project.label_config,
             'hostname': settings.HOSTNAME if settings.HOSTNAME else ('http://localhost:' + settings.INTERNAL_PORT),
             'access_token': project.created_by.auth_token.key
@@ -233,6 +235,147 @@ class MLApi(BaseHTTPAPI):
     def get_train_job_status(self, train_job):
         return self._request('job_status', request={'job': train_job.job_id}, timeout=TIMEOUT_TRAIN_JOB_STATUS)
 
+
+class CentralApi(BaseHTTPAPI):
+
+    def __init__(self, **kwargs):
+        super(CentralApi, self).__init__(**kwargs)
+        self._validate_request_timeout = 10
+
+    def _get_url(self, url_suffix):
+        url = CENTRAL_SERVICE_URL
+        if url[-1] != '/':
+            url += '/'
+        return urllib.parse.urljoin(url, url_suffix)
+
+    def _request(self, url_suffix, request=None, verbose=True, method='POST', *args, **kwargs):
+        assert method in ('POST', 'GET')
+        url = self._get_url(url_suffix)
+        request = request or {}
+        headers = dict(self.http.headers)
+        # if verbose:
+        #     logger.info(f'Request to {url}: {json.dumps(request, indent=2)}')
+        response = None
+        try:
+            if method == 'POST':
+                response = self.post(url=url, json=request, *args, **kwargs)
+            else:
+                response = self.get(url=url, *args, **kwargs)
+            response.raise_for_status()
+        except requests.exceptions.RequestException as e:
+            # logger.warning(f'Error getting response from {url}. ', exc_info=True)
+            status_code = response.status_code if response is not None else 0
+            return MLApiResult(url, request, {'error': str(e)}, headers, 'error', status_code=status_code)
+        status_code = response.status_code
+        try:
+            response = response.json()
+        except ValueError as e:
+            # logger.warning(f'Error parsing JSON response from {url}. Response: {response.content}', exc_info=True)
+            return MLApiResult(
+                url, request, {'error': str(e), 'response': response.content}, headers, 'error',
+                status_code=status_code
+            )
+        # if verbose:
+        #     logger.info(f'Response from {url}: {json.dumps(response, indent=2)}')
+        return MLApiResult(url, request, response, headers, status_code=status_code)
+
+    def _create_project_uid(self, project):
+        time_id = int(project.created_at.timestamp())
+        return f'{project.id}.{time_id}'
+    
+    def train(self, project, use_ground_truth=False):
+        # TODO Replace AnonymousUser with real user from request
+        user = AnonymousUser()
+        # Identify if feature flag is turned on
+        if flag_set('ff_back_dev_1417_start_training_mlbackend_webhooks_250122_long', user):
+            request = {
+                'action': 'PROJECT_UPDATED',
+                'project': load_func(settings.WEBHOOK_SERIALIZERS['project'])(instance=project).data
+            }
+            return self._request('webhook', request, verbose=False, timeout=TIMEOUT_PREDICT)
+        else:
+            # # get only tasks with annotations
+            # tasks = project.tasks.annotate(num_annotations=Count('annotations')).filter(num_annotations__gt=0)
+            # # create serialized tasks with annotations: {"data": {...}, "annotations": [{...}], "predictions": [{...}]}
+            # tasks_ser = ExportDataSerializer(tasks, many=True).data
+            # logger.debug(f'{len(tasks_ser)} tasks with annotations are sent to ML backend for training.')
+            request = {
+                # 'annotations': tasks_ser,
+                'project': self._create_project_uid(project),
+                'label_config': project.label_config,
+                # 'params': {
+                #     'login': project.task_data_login,
+                #     'password': project.task_data_password
+                # }
+            }
+            return self._request('task/train', request, verbose=False, timeout=TIMEOUT_PREDICT)
+    
+    def experiment(self, project, use_ground_truth=False):
+        # TODO Replace AnonymousUser with real user from request
+        user = AnonymousUser()
+        # Identify if feature flag is turned on
+        if flag_set('ff_back_dev_1417_start_training_mlbackend_webhooks_250122_long', user):
+            request = {
+                'action': 'PROJECT_UPDATED',
+                'project': load_func(settings.WEBHOOK_SERIALIZERS['project'])(instance=project).data
+            }
+            return self._request('webhook', request, verbose=False, timeout=TIMEOUT_PREDICT)
+        else:
+            # # get only tasks with annotations
+            # tasks = project.tasks.annotate(num_annotations=Count('annotations')).filter(num_annotations__gt=0)
+            # # create serialized tasks with annotations: {"data": {...}, "annotations": [{...}], "predictions": [{...}]}
+            # tasks_ser = ExportDataSerializer(tasks, many=True).data
+            # logger.debug(f'{len(tasks_ser)} tasks with annotations are sent to ML backend for training.')
+            request = {
+                # 'annotations': tasks_ser,
+                'project': self._create_project_uid(project),
+                'label_config': project.label_config,
+                # 'params': {
+                #     'login': project.task_data_login,
+                #     'password': project.task_data_password
+                # }
+            }
+            return self._request('task/experiment', request, verbose=False, timeout=TIMEOUT_PREDICT)
+
+    def make_predictions(self, tasks, model_version, project, context=None):
+        request = {
+            'tasks': tasks,
+            'model_version': model_version,
+            'project': self._create_project_uid(project),
+            'label_config': project.label_config,
+            'params': {
+                'login': project.task_data_login,
+                'password': project.task_data_password,
+                'context': context,
+            },
+        }
+        return self._request('predict', request, verbose=False, timeout=TIMEOUT_PREDICT)
+
+    def health(self):
+        return self._request('health', method='GET', timeout=TIMEOUT_HEALTH)
+
+    def validate(self, config):
+        return self._request('validate', request={'config': config}, timeout=self._validate_request_timeout)
+
+    def setup(self, project):
+        return self._request('setup', request={
+            'project': self._create_project_uid(project),
+            'schema': project.label_config,
+            'hostname': settings.HOSTNAME if settings.HOSTNAME else ('http://localhost:' + settings.INTERNAL_PORT),
+            'access_token': project.created_by.auth_token.key
+        }, timeout=TIMEOUT_SETUP)
+
+    def duplicate_model(self, project_src, project_dst):
+        return self._request('duplicate_model', request={
+            'project_src': self._create_project_uid(project_src),
+            'project_dst': self._create_project_uid(project_dst)
+        }, timeout=TIMEOUT_DUPLICATE_MODEL)
+
+    def delete(self, project):
+        return self._request('delete', request={'project': self._create_project_uid(project)}, timeout=TIMEOUT_DELETE)
+
+    def get_train_job_status(self, train_job):
+        return self._request('job_status', request={'job': train_job.job_id}, timeout=TIMEOUT_TRAIN_JOB_STATUS)
 
 def get_ml_api(project):
     if project.ml_backend_active_connection is None:

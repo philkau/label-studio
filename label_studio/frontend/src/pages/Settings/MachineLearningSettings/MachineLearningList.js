@@ -31,6 +31,24 @@ export const MachineLearningList = ({ backends, fetchBackends, onEdit }) => {
     await fetchBackends();
   }, [fetchBackends, api]);
 
+  const onStartCentralTraining = useCallback(async (backend) => {
+    await api.callApi('trainCentral', {
+      params: {
+        pk: backend.id,
+      },
+    });
+    await fetchBackends();
+  }, [fetchBackends, api]);
+
+  const onStartExperiment = useCallback(async (backend) => {
+    await api.callApi('experimentCentral', {
+      params: {
+        pk: backend.id,
+      },
+    });
+    await fetchBackends();
+  }, [fetchBackends, api]);
+
   return (
     <div className={rootClass}>
       {backends.map(backend => (
@@ -38,6 +56,8 @@ export const MachineLearningList = ({ backends, fetchBackends, onEdit }) => {
           key={backend.id}
           backend={backend}
           onStartTrain={onStartTraining}
+          onStartCentralTrain={onStartCentralTraining}
+          onStartExperiment={onStartExperiment}
           onDelete={onDeleteModel}
           onEdit={onEdit}
         />
@@ -46,7 +66,7 @@ export const MachineLearningList = ({ backends, fetchBackends, onEdit }) => {
   );
 };
 
-const BackendCard = ({backend, onStartTrain, onEdit, onDelete}) => {
+const BackendCard = ({backend, onStartTrain, onStartCentralTrain, onStartExperiment, onEdit, onDelete}) => {
   const confirmDelete = useCallback((backend) => {
     confirm({
       title: "Delete ML Backend",
@@ -86,9 +106,23 @@ const BackendCard = ({backend, onStartTrain, onEdit, onDelete}) => {
         </DescriptionList.Item>
       </DescriptionList>
 
-      <Button disabled={backend.state !== "CO"} onClick={() => onStartTrain(backend)}>
-        Start Training
-      </Button>
+      <div>
+        <Button disabled={backend.state !== "CO"} onClick={() => onStartTrain(backend)}>
+          Start Training
+        </Button>
+      </div>
+
+      <div>
+        <Button disabled={backend.state !== "CO"} onClick={() => onStartCentralTrain(backend)}>
+          Start Central Training
+        </Button>
+      </div>
+
+      <div>
+        <Button disabled={backend.state !== "CO"} onClick={() => onStartExperiment(backend)}>
+          Start Experimenting
+        </Button>
+      </div>
     </Card>
   );
 };
