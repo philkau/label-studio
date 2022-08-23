@@ -16,7 +16,7 @@ from core.permissions import all_permissions, ViewClassPermission
 from core.utils.common import get_object_with_check_and_log
 from projects.models import Project, Task
 from ml.serializers import MLBackendSerializer, MLInteractiveAnnotatingRequest
-from ml.models import MLBackend
+from ml.models import MLBackend, MLBackendState
 from ml.api_connector import MLApi
 from core.utils.common import bool_from_request
 
@@ -210,6 +210,33 @@ class MLBackendTrainAPI(APIView):
         ml_backend.train()
         return Response(status=status.HTTP_200_OK)
 
+class CentralTrainAPI(APIView):
+
+    permission_required = all_permissions.projects_change
+
+    def post(self, request, *args, **kwargs):
+        ml_backend = get_object_with_check_and_log(request, MLBackend, pk=self.kwargs['pk'])
+        self.check_object_permissions(self.request, ml_backend)
+
+        ml_backend.central_train()
+        if (ml_backend.state == MLBackendState.ERROR):
+            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR, data=ml_backend.error_message)
+        else:
+            return Response(status=status.HTTP_200_OK)
+
+class CentralExperimentAPI(APIView):
+
+    permission_required = all_permissions.projects_change
+
+    def post(self, request, *args, **kwargs):
+        ml_backend = get_object_with_check_and_log(request, MLBackend, pk=self.kwargs['pk'])
+        self.check_object_permissions(self.request, ml_backend)
+
+        ml_backend.central_experiment()
+        if (ml_backend.state == MLBackendState.ERROR):
+            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR, data=ml_backend.error_message)
+        else:
+            return Response(status=status.HTTP_200_OK)
 
 @method_decorator(
     name='post',

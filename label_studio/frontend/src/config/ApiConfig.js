@@ -52,6 +52,10 @@ export const API_CONFIG = {
     modelVersions: "/projects/:pk/model-versions",
     mlInteractive: "POST:/ml/:pk/interactive-annotating",
 
+    // Central Service
+    trainCentral: "POST:/ml/:pk/central-train",
+    experimentCentral: "POST:/ml/:pk/experiment",
+
     // Export
     export: "/projects/:pk/export",
     previousExports: "/projects/:pk/export/files",

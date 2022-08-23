@@ -10,7 +10,7 @@ from django.conf import settings
 
 from core.utils.common import safe_float, conditional_atomic, load_func
 
-from ml.api_connector import MLApi
+from ml.api_connector import MLApi, CentralApi
 from projects.models import Project
 from tasks.models import Prediction
 from tasks.serializers import TaskSimpleSerializer, PredictionSerializer
@@ -116,6 +116,10 @@ class MLBackend(models.Model):
     @property
     def api(self):
         return MLApi(url=self.url, timeout=self.timeout)
+
+    @property
+    def central_api(self):
+        return CentralApi(url=self.url, timeout=self.timeout)
 
     @property
     def not_ready(self):
@@ -300,6 +304,30 @@ class MLBackend(models.Model):
         result['data'] = ml_results[0]
         return result
 
+    def central_train(self):
+        train_response = self.central_api.train(self.project)
+        if train_response.is_error:
+            self.state = MLBackendState.ERROR
+            self.error_message = train_response.error_message
+        else:
+            self.state = MLBackendState.TRAINING
+            current_train_job = train_response.response.get('job')
+            if current_train_job:
+                MLBackendTrainJob.objects.create(job_id=current_train_job, ml_backend=self)
+        self.save()
+
+
+    def central_experiment(self):
+        train_response = self.central_api.experiment(self.project)
+        if train_response.is_error:
+            self.state = MLBackendState.ERROR
+            self.error_message = train_response.error_message
+        else:
+            self.state = MLBackendState.TRAINING
+            current_train_job = train_response.response.get('job')
+            if current_train_job:
+                MLBackendTrainJob.objects.create(job_id=current_train_job, ml_backend=self)
+        self.save()
 
 class MLBackendPredictionJob(models.Model):
 
