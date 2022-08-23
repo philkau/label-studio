@@ -238,19 +238,6 @@ class CentralExperimentAPI(APIView):
         else:
             return Response(status=status.HTTP_200_OK)
 
-class CentralExperimentAPI(APIView):
-
-    permission_required = all_permissions.projects_change
-
-    def post(self, request, *args, **kwargs):
-        ml_backend = get_object_with_check_and_log(request, MLBackend, pk=self.kwargs['pk'])
-        self.check_object_permissions(self.request, ml_backend)
-
-        print ("Central Service Train....")
-        print (ml_backend)
-        # ml_backend.train()
-        return Response(status=status.HTTP_200_OK)
-
 @method_decorator(
     name='post',
     decorator=swagger_auto_schema(
